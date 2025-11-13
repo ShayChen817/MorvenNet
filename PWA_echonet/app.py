@@ -122,26 +122,27 @@ def advertiser_thread():
     zc = Zeroconf(ip_version=4)
     ip = get_local_ip()
 
+    props = {
+        "id": NODE_ID,
+        "skills": json.dumps(SKILLS),
+        "metrics": json.dumps(get_node_metrics()),
+    }
+
+    info = ServiceInfo(
+        "_echotest._tcp.local.",
+        f"{NODE_ID}._echotest._tcp.local.",
+        addresses=[socket.inet_aton(ip)],
+        port=PORT,
+        properties=props,
+    )
+
+    zc.register_service(info)
+
     while True:
-        metrics = get_node_metrics()
-
-        props = {
-            "id": NODE_ID,
-            "skills": json.dumps(SKILLS),
-            "metrics": json.dumps(metrics),
-        }
-
-        info = ServiceInfo(
-            "_echotest._tcp.local.",
-            f"{NODE_ID}._echotest._tcp.local.",
-            addresses=[socket.inet_aton(ip)],
-            port=PORT,
-            properties=props,
-        )
-
-        zc.register_service(info)
+        # update metrics without re-registering
+        info.properties[b"metrics"] = json.dumps(get_node_metrics()).encode()
+        zc.update_service(info)
         time.sleep(3)
-        zc.unregister_service(info)
 
 
 # ----------------------------
