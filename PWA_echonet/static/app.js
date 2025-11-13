@@ -44,7 +44,7 @@ setInterval(() => {
     updateClock();
     updateInfo();
     updateNodes();
-}, 4000);
+}, 1000);
 
 updateClock();
 updateInfo();
