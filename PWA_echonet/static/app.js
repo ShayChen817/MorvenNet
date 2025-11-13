@@ -7,7 +7,7 @@ function updateClock() {
 async function updateInfo() {
     try {
         let controller = new AbortController();
-        setTimeout(() => controller.abort(), 500);
+        setTimeout(() => controller.abort(), 2000);
 
         let r = await fetch("/info", { signal: controller.signal });
         let data = await r.json();
