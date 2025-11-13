@@ -5,31 +5,47 @@ function updateClock() {
 }
 
 async function updateInfo() {
-    let r = await fetch("/info");
-    let data = await r.json();
+    try {
+        let controller = new AbortController();
+        setTimeout(() => controller.abort(), 500);
 
-    document.getElementById("cpu").innerText = data.cpu;
-    document.getElementById("battery").innerText = data.battery;
+        let r = await fetch("/info", { signal: controller.signal });
+        let data = await r.json();
+
+        document.getElementById("cpu").innerText = data.cpu;
+        document.getElementById("battery").innerText = data.battery;
+
+    } catch (e) {
+        document.getElementById("cpu").innerText = "??";
+        document.getElementById("battery").innerText = "??";
+    }
 }
 
 async function updateNodes() {
-    let r = await fetch("/nodes");
-    let nodes = await r.json();
+    try {
+        let r = await fetch("/nodes");
+        let nodes = await r.json();
 
-    let list = document.getElementById("node-list");
-    list.innerHTML = "";
+        let list = document.getElementById("node-list");
+        list.innerHTML = "";
 
-    nodes.forEach(n => {
-        let item = document.createElement("li");
-        item.innerText = `${n.id} — CPU: ${n.cpu}% — Battery: ${n.battery}%`;
-        list.appendChild(item);
-    });
+        nodes.forEach(n => {
+            let item = document.createElement("li");
+            item.innerText = `${n.id} — CPU: ${n.cpu}% — Battery: ${n.battery}%`;
+            list.appendChild(item);
+        });
+
+    } catch (e) {
+        console.log("nodes update failed");
+    }
 }
 
 setInterval(() => {
+    updateClock();
     updateInfo();
     updateNodes();
-}, 2000);
+}, 1000);
 
+updateClock();
 updateInfo();
 updateNodes();
