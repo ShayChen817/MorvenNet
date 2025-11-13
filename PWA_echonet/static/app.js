@@ -1,3 +1,9 @@
+function updateClock() {
+    let now = new Date();
+    document.getElementById("clock").innerText =
+        now.toLocaleTimeString();
+}
+
 async function updateInfo() {
     let r = await fetch("/info");
     let data = await r.json();
