@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Echonet Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+    <h1>Echonet Dashboard 💕</h1>
+
+    <div class="card">
+        <h2>Your Device</h2>
+        <p>CPU: <span id="cpu">loading...</span>%</p>
+        <p>Battery: <span id="battery">loading...</span>%</p>
+    </div>
+
+    <div class="card">
+        <h2>Other Nodes</h2>
+        <ul id="node-list"></ul>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
