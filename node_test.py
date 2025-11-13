@@ -2,23 +2,22 @@ import time
 import json
 import socket
 import psutil
+import threading
 from zeroconf import Zeroconf, ServiceInfo, ServiceBrowser
 
 # ----------------------------
-# CHANGE THIS PER DEVICE
+# CONFIG
 # ----------------------------
-NODE_ID = "nodeA"       # <---- change to “nodeB” on the second laptop
+NODE_ID = "nodeA"   # Change to nodeB on second machine
 PORT = 9999
 SKILLS = ["test-skill"]
 
-# Maximum "weight" this device can handle (your decision)
 MAX_LOAD = 10
 current_load = 0
 # ----------------------------
 
 
 def get_local_ip():
-    """Get LAN IP address."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(("8.8.8.8", 80))
@@ -31,38 +30,24 @@ def get_local_ip():
 
 
 def get_battery():
-    """Get battery percentage or None if unavailable."""
     try:
         bat = psutil.sensors_battery()
-        if bat:
-            return bat.percent
-        return None
+        return bat.percent if bat else None
     except:
         return None
 
 
 def compute_health(cpu, battery, load):
-    """Define a health score (0-1)"""
     score = 1.0
+    if cpu > 80: score -= 0.3
+    elif cpu > 50: score -= 0.15
 
-    # CPU penalty
-    if cpu > 80:
-        score -= 0.3
-    elif cpu > 50:
-        score -= 0.15
-
-    # Battery penalty
     if battery is not None:
-        if battery < 20:
-            score -= 0.4
-        elif battery < 50:
-            score -= 0.2
+        if battery < 20: score -= 0.4
+        elif battery < 50: score -= 0.2
 
-    # Load penalty
-    if load > MAX_LOAD * 0.75:
-        score -= 0.2
-    elif load > MAX_LOAD * 0.5:
-        score -= 0.1
+    if load > MAX_LOAD * 0.75: score -= 0.2
+    elif load > MAX_LOAD * 0.5: score -= 0.1
 
     return max(score, 0.0)
 
@@ -70,7 +55,6 @@ def compute_health(cpu, battery, load):
 def get_node_metrics():
     cpu = psutil.cpu_percent()
     battery = get_battery()
-
     health = compute_health(cpu, battery, current_load)
 
     return {
@@ -83,9 +67,8 @@ def get_node_metrics():
 
 
 class DiscoveryListener:
-
-    def add_service(self, zeroconf, service_type, name):
-        info = zeroconf.get_service_info(service_type, name)
+    def add_service(self, zc, service_type, name):
+        info = zc.get_service_info(service_type, name)
         if not info:
             return
 
@@ -95,67 +78,53 @@ class DiscoveryListener:
         if node_id == NODE_ID:
             return
 
-        device_metrics = json.loads(info.properties[b"metrics"].decode())
+        metrics = json.loads(info.properties[b"metrics"].decode())
         skills = json.loads(info.properties[b"skills"].decode())
 
         print(f"\n✨ FOUND NODE → {node_id} @ {node_ip}:{info.port}")
-        print(f"   skills:    {skills}")
-        print(f"   cpu:       {device_metrics['cpu']}%")
-        print(f"   battery:   {device_metrics['battery']}")
-        print(f"   load:      {device_metrics['load']} / {device_metrics['max_load']}")
-        print(f"   health:    {device_metrics['health']:.2f}")
-
-    def update_service(self, zc, service_type, name):
-        # not needed now
-        pass
+        print(f"   skills: {skills}")
+        print(f"   cpu: {metrics['cpu']}%")
+        print(f"   battery: {metrics['battery']}")
+        print(f"   load: {metrics['load']} / {metrics['max_load']}")
+        print(f"   health: {metrics['health']:.2f}")
 
     def remove_service(self, zc, service_type, name):
         print(f"💦 Node disappeared: {name}")
 
 
-def advertise():
-    """Advertise node metrics via Zeroconf."""
+def advertiser():
+    """Correct Zeroconf advertisement loop (no unregister)."""
     zc = Zeroconf()
     ip = get_local_ip()
 
+    metrics = get_node_metrics()
+    props = {
+        "id": NODE_ID,
+        "skills": json.dumps(SKILLS),
+        "metrics": json.dumps(metrics),
+    }
+
+    info = ServiceInfo(
+        "_echotest._tcp.local.",
+        f"{NODE_ID}._echotest._tcp.local.",
+        addresses=[socket.inet_aton(ip)],
+        port=PORT,
+        properties=props,
+    )
+
+    zc.register_service(info)
+    print(f"📡 Registered {NODE_ID} @ {ip}:{PORT}")
+
     while True:
-        # Create metrics object
-        metrics = get_node_metrics()
-        props = {
-            "id": NODE_ID,
-            "skills": json.dumps(SKILLS),
-            "metrics": json.dumps(metrics)
-        }
-
-        info = ServiceInfo(
-            "_echotest._tcp.local.",
-            f"{NODE_ID}._echotest._tcp.local.",
-            addresses=[socket.inet_aton(ip)],
-            port=PORT,
-            properties=props,
-        )
-
-        # Register (or update) the service every 3 seconds
-        zc.register_service(info)
+        # Update metrics only — no unregister
+        info.properties[b"metrics"] = json.dumps(get_node_metrics()).encode()
+        zc.update_service(info)
         time.sleep(3)
-        zc.unregister_service(info)
 
 
 if __name__ == "__main__":
-    # Start advertiser in background thread
-    import threading
-    adv_thread = threading.Thread(target=advertise, daemon=True)
+    adv_thread = threading.Thread(target=advertiser, daemon=True)
     adv_thread.start()
 
-    # Start discovery browser
     zc = Zeroconf()
-    ServiceBrowser(zc, "_echotest._tcp.local.", DiscoveryListener())
-
-    print("\n🔥 Running — waiting for other devices with metrics...\n")
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("🛑 Stopping...")
-        zc.close()
+    ServiceBrowser(zc, "_echotest._tcp.lo
