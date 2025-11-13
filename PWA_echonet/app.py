@@ -152,6 +152,10 @@ def advertiser_thread():
 def serve_index():
     return app.send_static_file("index.html")
 
+@app.get("/info")
+def info():
+    return jsonify(get_node_metrics())
+
 
 @app.get("/nodes")
 def get_nodes():
