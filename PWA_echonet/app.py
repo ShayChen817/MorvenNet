@@ -171,13 +171,24 @@ def serve_static(path):
 # MAIN
 # ----------------------------
 if __name__ == "__main__":
-    # start advertiser
+    # Start advertiser first
     threading.Thread(target=advertiser_thread, daemon=True).start()
 
-    # start scan listener
+    # Start Flask
+    flask_thread = threading.Thread(
+        target=lambda: app.run(host="0.0.0.0", port=PORT),
+        daemon=True
+    )
+    flask_thread.start()
+
+    time.sleep(1)   # Allow Flask to start fully
+
+    # Start Zeroconf browser LAST
     zc = Zeroconf(ip_version=4)
     ServiceBrowser(zc, "_echotest._tcp.local.", DiscoveryListener())
 
-    print("\n🔥 Unified APP.PY running... Zeroconf + PWA + Nodes all in one!\n")
+    print("\n🔥 All systems running...\n")
 
-    app.run(host="0.0.0.0", port=PORT)
+    while True:
+        time.sleep(1)
+
